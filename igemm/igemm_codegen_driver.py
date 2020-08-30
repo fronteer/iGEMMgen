@@ -36,7 +36,9 @@ class igemm_codegen_driver_t(mc_base_t):
         kernel_list = []
 
         # gtc bwd
-        kernel_list.extend([igemm_bwd_gtc_t(mc, igemm_gtc_tunable_parameter_t(td)) for td in tunable_dicts])
+        #kernel_list.extend([igemm_bwd_gtc_t(mc, igemm_gtc_tunable_parameter_t(td)) for td in tunable_dicts])
+        # gtc fwd
+        kernel_list.extend([igemm_fwd_gtc_t(mc, igemm_gtc_tunable_parameter_t(td)) for td in tunable_dicts])
 
         self.kernel_list = kernel_list
 
@@ -63,7 +65,7 @@ class igemm_codegen_driver_t(mc_base_t):
 
     def emit_igemm_macro(self):
         # igemm algorithm related macros
-        # emit_v4r1_dynamic_macros(self.mc, self.tunable_dicts)
+        emit_v4r1_dynamic_macros(self.mc, self.tunable_dicts)
         for kernel in self.kernel_list:
             macro_list = kernel.get_kernel_macros()
             # assert len(macro_list), ''
@@ -73,7 +75,7 @@ class igemm_codegen_driver_t(mc_base_t):
 
     def emit_igemm_kernel(self):
         # emit the kernel
-        #emit_v4r1_dynamic_kernel(self.mc, self.tunable_dicts)
+        emit_v4r1_dynamic_kernel(self.mc, self.tunable_dicts); 
         for kernel in self.kernel_list:
             self._emit(';----------------------------------------------------------')
             self._emit('; starting of kernel {}'.format(kernel.name()))
@@ -98,9 +100,12 @@ class igemm_codegen_driver_t(mc_base_t):
     def do_emit(self):
         self.emit_hsa_header()
         self.emit_global_macro()
+        self._emit('; ------------ kernel specific content start  -------------------------'); 
         self.emit_igemm_macro()
         self.emit_igemm_kernel()
         self.emit_metadata()
+
+        self._emit('; ------------ kernel specific content end -------------------------'); 
 
     def do_compile(self):
         ass = compile_asm_t(self.mc, self.mc.emitter.file_name)
