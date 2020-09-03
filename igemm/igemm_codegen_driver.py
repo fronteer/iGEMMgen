@@ -65,7 +65,7 @@ class igemm_codegen_driver_t(mc_base_t):
 
     def emit_igemm_macro(self):
         # igemm algorithm related macros
-        emit_v4r1_dynamic_macros(self.mc, self.tunable_dicts)
+        ##emit_v4r1_dynamic_macros(self.mc, self.tunable_dicts)
         for kernel in self.kernel_list:
             macro_list = kernel.get_kernel_macros()
             # assert len(macro_list), ''
@@ -75,7 +75,7 @@ class igemm_codegen_driver_t(mc_base_t):
 
     def emit_igemm_kernel(self):
         # emit the kernel
-        emit_v4r1_dynamic_kernel(self.mc, self.tunable_dicts); 
+        ##emit_v4r1_dynamic_kernel(self.mc, self.tunable_dicts); 
         for kernel in self.kernel_list:
             self._emit(';----------------------------------------------------------')
             self._emit('; starting of kernel {}'.format(kernel.name()))

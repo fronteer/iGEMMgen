@@ -25,7 +25,6 @@
 ################################################################################
 # pylint: disable=maybe-no-member
 from .igemm_base import *
-from ..amdgpu import *
 from ..codegen import *
 from .conv import *
 import copy
@@ -2413,4 +2412,4 @@ def emit_v4r1_dynamic_kernel(mc, tunable_dicts):
         kernel._emit_unique_macro()
         kernel_info_list.append(kernel.get_kernel_info())
 
-    emit_amd_metadata_t(mc, kernel_info_list).emit()
+    ##emit_amd_metadata_t(mc, kernel_info_list).emit()
