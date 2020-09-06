@@ -135,7 +135,7 @@ measured_fp32_conv_gflops(double time_ms, size_t n, size_t c, size_t hi,
 }
 
 #include "igemm_gtc_base.h"
-#include "igemm_bwd_gtc_driver.h"
+#include "igemm_fwd_gtc_driver.h"
 
 #ifndef ABS
 #define ABS(x) ((x) > 0 ? (x) : -1 * (x))
@@ -404,6 +404,7 @@ int main(int argc, char **argv) {
         if (need_verify)
             free(device_output_to_host);
     }
+/*
     if (need_bwd){
         float *device_input_to_host = NULL;
         if (need_verify) {
@@ -437,7 +438,7 @@ int main(int argc, char **argv) {
                 HIP_CALL(hipMemset(device_input, 0,
                                    n * c * hi * wi * sizeof(float)));
             result_t result =
-                conv_bwd_driver.run(&conv_args, tunable, module, device_input,
+                conv_fwd_driver.run(&conv_args, tunable, module, device_input,
                                 device_weight, device_output, warmup, repeat);
             if (result.return_code != 0)
                 continue;
@@ -466,6 +467,7 @@ int main(int argc, char **argv) {
     if (need_wrw){
         // un implemented
     }
+*/    
 
     free(host_input);
     free(host_weight);
