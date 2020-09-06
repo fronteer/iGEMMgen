@@ -383,8 +383,11 @@ int main(int argc, char **argv) {
     double fp32_gflops =
         theoritical_fp32_gflops(((double)sclk_mhz) / 1000.0, num_cu, num_simd);
 
+
+    float *device_output_to_host = NULL;
+    float *device_input_to_host = NULL;
+
     if (need_fwd){
-        float *device_output_to_host = NULL;
         if (need_verify) {
             // gen rand
             gen_rand_vector<float, float>(host_input, n * c * hi * wi, 0.0, 1.0);
@@ -404,9 +407,8 @@ int main(int argc, char **argv) {
         if (need_verify)
             free(device_output_to_host);
     }
-/*
+
     if (need_bwd){
-        float *device_input_to_host = NULL;
         if (need_verify) {
             // gen rand
             gen_rand_vector<float, float>(host_output, n * k * ho * wo, 0.0, 1.0);
@@ -421,22 +423,18 @@ int main(int argc, char **argv) {
             // printf("len:%d\n", n * c * hi * wi * sizeof(float) );
         }
 
-        HIP_CALL(hipMemcpy(device_output, host_output,
-                       n * k * ho * wo * sizeof(float), hipMemcpyHostToDevice));
-        HIP_CALL(hipMemcpy(device_weight, host_weight,
-                       k * c * y * x * sizeof(float), hipMemcpyHostToDevice));
-        
+        HIP_CALL(hipMemcpy(device_output, host_output, n * k * ho * wo * sizeof(float), hipMemcpyHostToDevice));
+        HIP_CALL(hipMemcpy(device_weight, host_weight, k * c * y * x * sizeof(float), hipMemcpyHostToDevice));
+     };         
 
-        igemm_bwd_gtc_t conv_bwd_driver;
-        double nrms = get_bwd_nrms();
+     if ( need_fwd ) {
+        igemm_fwd_gtc_t conv_fwd_driver;
+        double nrms = get_fwd_nrms();
         for (int i = 0; i < tunables.size(); i++) {
             igemm_gtc_tunable_t *tunable = &tunables[i];
 
-            printf("  %s, ", conv_bwd_driver.get_kernel_name(tunable).c_str());
+            printf("  %s, ", conv_fwd_driver.get_kernel_name(tunable).c_str());
 
-            if (need_verify)
-                HIP_CALL(hipMemset(device_input, 0,
-                                   n * c * hi * wi * sizeof(float)));
             result_t result =
                 conv_fwd_driver.run(&conv_args, tunable, module, device_input,
                                 device_weight, device_output, warmup, repeat);
@@ -448,11 +446,11 @@ int main(int argc, char **argv) {
             printf("cost:%.3fms, tflops:%.3f(%.2f%%)", result.duration_ms,
                    gflops / 1000 , (gflops / fp32_gflops) * 100);
             if (need_verify) {
-                HIP_CALL(hipMemcpy(device_input_to_host, device_input,
-                                   n * c * hi * wi * sizeof(float),
+                HIP_CALL(hipMemcpy(device_output_to_host, device_output,
+                                   n * k * ho * wo * sizeof(float),
                                    hipMemcpyDeviceToHost));
-                bool is_valid = valid_vector(host_input, device_input_to_host,
-                                            n * c * hi * wi, nrms);
+                bool is_valid = valid_vector(host_output, device_output_to_host,
+                                            n * k * ho * wo, nrms);
                 printf(", valid:%s", is_valid ? "y" : "n");
                 // if (!is_valid) {
                 //     printf("\n");
@@ -462,12 +460,12 @@ int main(int argc, char **argv) {
             printf("\n");
         }
         if (need_verify) 
-            free(device_input_to_host);
-    }
+            free(device_output_to_host);
+    }; 
+
     if (need_wrw){
         // un implemented
     }
-*/    
 
     free(host_input);
     free(host_weight);
