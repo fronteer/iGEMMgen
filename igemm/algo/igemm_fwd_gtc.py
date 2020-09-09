@@ -62,6 +62,21 @@ class macro_igemm_fwd_gtc_in_update_os_t(mc_base_t):
             self._emit(f"v_mad_u32_u24 v[\\v_tmp], s[\\s_wi], v[\\v_in_ihi], v[\\v_in_iwi]")
             self._emit(f"v_lshl_add_u32 v[\\v_in_os], v[\\v_tmp], {igemm_log2(self.data_byte)}, v[\\v_in_os_base]")
 
+class macro_igemm_fwd_gtc_in_update_hw_t(mc_base_t):
+    def __init__(self, mc):
+        mc_base_t.__init__(self, mc)
+    def name(self):
+        return '.v_fwd_gtc_in_update_hw'
+    def __call__(self, v_in_ihi, v_in_iwi, s_dilation_h, s_dilation_w, v_diff_iy, v_diff_ix, v_tmp, v_tmp1):
+        return '{} {}, {}, {}, {}, {}, {}, {}, {}'.format(self.name(),
+            v_in_ihi, v_in_iwi, s_dilation_h, s_dilation_w, v_diff_iy, v_diff_ix, v_tmp, v_tmp1)
+    def emit(self):
+        with self._emit_macro_indented('.macro {} v_in_ihi, v_in_iwi, s_dilation_h, s_dilation_w, v_diff_iy, v_diff_ix, v_tmp, v_tmp1'.format(self.name())):
+            self._emit(f"v_mul_lo_u32 v[\\v_tmp], s[\\s_dilation_h], v[\\v_diff_iy]")
+            self._emit(f"v_mul_lo_u32 v[\\v_tmp1], s[\\s_dilation_w], v[\\v_diff_ix]")
+            self._emit(f"v_add_u32 v[\\v_in_ihi], v[\\v_diff_iy], v[\\v_in_ihi]")
+            self._emit(f"v_add_u32 v[\\v_in_iwi], v[\\v_diff_ix], v[\\v_in_iwi]")
+
 class macro_igemm_fwd_gtc_wei_update_os_t(mc_base_t):
     def __init__(self, mc, data_byte):
         mc_base_t.__init__(self, mc)
@@ -176,7 +191,7 @@ class macro_igemm_fwd_gtc_move_slice_window_c_y_x(mc_base_t):
                 pass        # the final dimension indeed can be ignored
         '''
         with self._emit_macro_indented('.macro {} v_move_slice_k_ic1, v_move_slice_k_iy, v_move_slice_k_ix, s_gemm_k_num_c1, s_gemm_k_num_y, s_gemm_k_num_x, s_move_slice_k_c1, s_move_slice_k_y, s_move_slice_k_x, v_in_os_base, v_wei_os_base, s_in_stride_c, s_wei_stride_c, s_in_stride_c_c1, s_wei_stride_c_c1, s_in_stride_c_c0_c1_diff, s_wei_stride_c_c0_c1_diff'.format(self.name())):
-            # c0, c1e is unmerge.  c1e is merged from c1, e
+            # update in order ix -> iy -> ic1
             self._emit(f"v_add_u32 v[\\v_move_slice_k_ix], s[\\s_move_slice_k_x], v[\\v_move_slice_k_ix]")
             self._emit(f"v_cmpx_le_u32 vcc, s[\\s_gemm_k_num_x], v[\\v_move_slice_k_ix]")
             self._emit(f"v_subrev_u32 v[\\v_move_slice_k_ix], s[\\s_gemm_k_num_x], v[\\v_move_slice_k_ix]")
@@ -203,7 +218,7 @@ class macro_igemm_fwd_gtc_move_slice_window_c_y_x(mc_base_t):
             self._emit(f"s_mov_b64 exec, -1")
             self._emit_empty_line()
 
-class macro_igemm_bwd_gtc_move_slice_window_c(mc_base_t):
+class macro_igemm_fwd_gtc_move_slice_window_c(mc_base_t):
     '''
     optimized move slice approach.
     '''
@@ -255,6 +270,7 @@ class macro_igemm_bwd_gtc_move_slice_window_c(mc_base_t):
 
     def emit(self):
         with self._emit_macro_indented('.macro {} v_move_slice_k_ic1, s_gemm_k_num_c1, s_move_slice_k_c1, v_in_os, v_wei_os, s_in_stride_c_c1, s_wei_stride_c_c1, s_in_stride_c_c0_c1_diff, s_wei_stride_c_c0_c1_diff'.format(self.name())):
+            # update ic1
             self._emit(f"v_add_u32 v[\\v_move_slice_k_ic1], s[\\s_move_slice_k_c1], v[\\v_move_slice_k_ic1]")
             self._emit(f"v_add_u32 v[\\v_out_os], s[\\s_in_stride_c_c1], v[\\v_in_os]")
             self._emit(f"v_add_u32 v[\\v_wei_os], s[\\s_wei_stride_c_c1], v[\\v_wei_os]")
@@ -265,7 +281,7 @@ class macro_igemm_bwd_gtc_move_slice_window_c(mc_base_t):
             self._emit(f"s_mov_b64 exec, -1")
             self._emit_empty_line()
 
-class macro_igemm_bwd_gtc_move_slice_window_c_1d(mc_base_t):
+class macro_igemm_fwd_gtc_move_slice_window_c_1d(mc_base_t):
     '''
     optimized move slice approach.
     '''
@@ -310,6 +326,7 @@ class macro_igemm_bwd_gtc_move_slice_window_c_1d(mc_base_t):
 
     def emit(self):
         with self._emit_macro_indented('.macro {} v_in_os, v_wei_os, s_in_stride_c_c1, s_wei_stride_c_c1'.format(self.name())):
+            # update ic1
             self._emit(f"v_add_u32 v[\\v_out_os], s[\\s_in_stride_c_c1], v[\\v_in_os]")
             self._emit(f"v_add_u32 v[\\v_wei_os], s[\\s_wei_stride_c_c1], v[\\v_wei_os]")
             self._emit_empty_line()
@@ -698,13 +715,13 @@ class igemm_fwd_gtc_t(mc_base_t):
 
             self.v_gtc_ic1           = sym_t("v_gtc_ic1"      ,vseq(1))
             if outer.tunable.nxe != 0:
-                self.v_gtc_iy        = sym_t("v_gtc_iy"       ,vseq(1))
-                self.v_gtc_ix        = sym_t("v_gtc_ix"       ,vseq(1))
+                self.v_gtc_iy        = sym_t("v_gtc_iy"       , self.v_wei_iy.value)
+                self.v_gtc_ix        = sym_t("v_gtc_ix"       , self.v_wei_ix.value)
 
             self.v_move_slice_k_ic1  = sym_t("v_move_slice_k_ic1" , self.v_gtc_ic1.value)
             if outer.tunable.nxe != 0:
-                self.v_move_slice_k_iy = sym_t("v_move_slice_k_iy" , self.v_gtc_iy.value)
-                self.v_move_slice_k_ix = sym_t("v_move_slice_k_ix" , self.v_gtc_ix.value)
+                self.v_move_slice_k_iy = sym_t("v_move_slice_k_iy" , self.v_wei_iy.value)
+                self.v_move_slice_k_ix = sym_t("v_move_slice_k_ix" , self.v_wei_ix.value)
 
             self.v_gtc_ic0       = sym_t("v_gtc_ic0"      ,v_c_num - 1)
             self.v_gtc_ic1e      = sym_t("v_gtc_ic1e"     ,v_c_num - 2)
@@ -929,6 +946,10 @@ class igemm_fwd_gtc_t(mc_base_t):
 
     def get_macro_in_update_os(self):
         return macro_igemm_fwd_gtc_in_update_os_t(self.mc, amdgpu_precision_data_byte(self.tunable.precision))
+
+    def get_macro_in_update_hw(self):
+        return macro_igemm_fwd_gtc_in_update_hw_t(self.mc)
+
     def get_macro_wei_update_os(self):
         return macro_igemm_fwd_gtc_wei_update_os_t(self.mc, amdgpu_precision_data_byte(self.tunable.precision))
     def get_macro_set_flag_hw(self):
@@ -1589,13 +1610,26 @@ class igemm_fwd_gtc_t(mc_base_t):
         def move_slice_window_b():
             if self.tunable.nxe != 0:
                 m_move_slice_window   = self.get_macro_move_slice_window()
-                m_in_update_os       = self.get_macro_in_update_os()
+                m_in_update_os        = self.get_macro_in_update_os()
+                m_in_update_hw        = self.get_macro_in_update_hw()
                 m_set_flag_hw         = self.get_macro_set_flag_hw()
                 with self._deferred_context():
+                    # save the pre-updating values of v_move_slice_k_iy/ix
+                    self._emit(f"v_mov_b32 v[{v.v_tmp()}], v[{v.v_move_slice_k_iy()}]")
+                    self._emit(f"v_mov_b32 v[{v.v_tmp(1)}], v[{v.v_move_slice_k_ix()}]")
+
                     ## ToDo: add the variation of v_in_ihi/v_in_iwi caused from the variation in v_wei_iy/v_wei_ix
                     self._emit(m_move_slice_window(v.v_move_slice_k_ic1(), v.v_move_slice_k_iy(), v.v_move_slice_k_ix(), s.s_gemm_k_num_c1(), s.s_gemm_k_num_y(), s.s_gemm_k_num_x(),
                             s.s_move_slice_k_c1(), s.s_move_slice_k_y(), s.s_move_slice_k_x(), v.v_in_os_base(), v.v_wei_os_base(),
                             s.s_in_stride_c(), s.s_wei_stride_c(), s.s_in_stride_c_c1(), s.s_wei_stride_c_c1(), s.s_in_stride_c_c0_c1_diff(), s.s_wei_stride_c_c0_c1_diff()))
+
+                    # save the final difference between the pre-updating and post-updating values of v_move_slice_k_iy/ix
+                    self._emit(f"v_sub_u32 v[{v.v_tmp()}], v[{v.v_move_slice_k_iy()}], v[{v.v_tmp()}]")
+                    self._emit(f"v_sub_u32 v[{v.v_tmp(1)}], v[{v.v_move_slice_k_ix()}], v[{v.v_tmp(1)}]")
+
+                    ## v_tmp() and v_tmp(1) are the v_diff_iy(), v_diff_ix() outputed from m_move_slice_window()
+                    ## v_tmp(2) and v_tmp(3) are tempary used by m_in_update_hw()
+                    self._emit(m_in_update_hw(v.v_in_ihi(), v.v_in_iwi(), s.s_dilation_h(), s.s_dilation_w(), v.v_tmp(), v.v_tmp(1), v.v_tmp(2), v.v_tmp(3)))
                     self._emit(m_in_update_os(v.v_in_os(), v.v_in_os_base(), v.v_in_ihi(), v.v_in_iwi(), s.s_wi(), v.v_tmp()))
                     self._emit(m_set_flag_hw(v.v_in_flag(), v.v_in_ihi(), v.v_in_iwi(), s.s_hi(), s.s_wi()))
                 return self._get_deferred()
